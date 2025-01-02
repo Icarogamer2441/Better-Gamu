@@ -11,15 +11,20 @@ interface UseChatProps {
   onCodeGenerated: (code: string) => void
 }
 
+interface ImageData {
+  mimeType: string;
+  data: string;
+}
+
 export function useChat({ onCodeGenerated }: UseChatProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
 
   const { mutate: sendMessage, isPending: isLoading } = useMutation({
-    mutationFn: async (message: string) => {
-      const userMessage: ChatMessage = { role: 'user', content: message }
+    mutationFn: async (params: { message: string; imageData?: ImageData }) => {
+      const userMessage: ChatMessage = { role: 'user', content: params.message }
       setMessages(prev => [...prev, userMessage])
 
-      const response = await chatWithGemini([...messages, userMessage])
+      const response = await chatWithGemini([...messages, userMessage], params.imageData)
       const assistantMessage: ChatMessage = { role: 'assistant', content: response }
       setMessages(prev => [...prev, assistantMessage])
 

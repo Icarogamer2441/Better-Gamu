@@ -271,7 +271,7 @@ export function CodePanel({ code }: CodePanelProps) {
           </div>
         ) : (
           <div className="relative h-full">
-            <div className="w-[857px]">
+            <div className="w-full lg:w-[857px]">
               <Sandpack
                 template="static"
                 files={files}

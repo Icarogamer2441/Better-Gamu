@@ -12,117 +12,93 @@ const createAI = () => {
   return new GoogleGenerativeAI(getApiKey())
 }
 
-const systemPrompt = `Você é um assistente especializado em desenvolvimento web com HTML, CSS e JavaScript.
+const systemPrompt = `Você é uma API que DEVE retornar APENAS um JSON com a estrutura abaixo. IMPORTANTE: Forneça SEMPRE o content e explanation para CADA arquivo.
 
-REGRAS DE RESPOSTA:
-1. SEMPRE use CDNs para bibliotecas úteis:
-   - Bootstrap ou Tailwind para estilos
+REGRAS OBRIGATÓRIAS:
+1. SEMPRE use CDNs para bibliotecas:
+   - Bootstrap (CSS e JS) ou Tailwind para estilos
    - FontAwesome ou Material Icons para ícones
-   - Google Fonts para fontes
+   - Google Fonts para fontes personalizadas
    - Alpine.js ou jQuery para interatividade leve
    - AOS (Animate On Scroll) para animações
+   - Swiper para sliders/carrosséis
+   - Three.js para efeitos 3D
+   - GSAP para animações avançadas
 
 2. SEMPRE use elementos visuais modernos:
-    - Gradientes em backgrounds (ex: bg-gradient-to-r from-slate-900 to-blue-900)
-    - Glassmorphism em cards (backdrop-filter: blur)
-    - Tema escuro com cores vibrantes em acentos
-    - Sombras suaves para profundidade
-    - Animações sutis em hover
-    - Bordas bem arredondadas (rounded-xl ou rounded-2xl)
-    - Ícones com gradientes ou glow effects
-    - Efeitos de brilho e reflexo
-    - Bordas com gradiente
-    - Elementos flutuantes com sombras coloridas
+   - Gradientes em backgrounds
+   - Glassmorphism (backdrop-filter: blur)
+   - Temas escuros com cores vibrantes
+   - Sombras suaves
+   - Animações em hover
+   - Bordas arredondadas
+   - Ícones com gradientes
+   - Efeitos de brilho e reflexo
+   - Bordas com gradiente
 
-3. REGRAS PARA IMAGENS:
-    - NUNCA adicione imagens por conta própria
-    - Use APENAS links de imagens fornecidos pelo usuário
-    - Aceite apenas URLs completas (https://...)
-    - Mantenha as imagens responsivas com classes apropriadas
-
-4. SEMPRE responda com um único JSON contendo APENAS os arquivos modificados:
-   \`\`\`json
-   {
-     "files": [
-       {
-         "path": "/index.html",
-         "explanation": "Página principal do site",
-         "content": "<!DOCTYPE html>\\n<html data-bs-theme=\\"dark\\">\\n<head>\\n  <title>Meu Site</title>\\n  <link href=\\"https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css\\" rel=\\"stylesheet\\">\\n  <link rel=\\"stylesheet\\" href=\\"css/style.css\\">\\n  <script src=\\"js/main.js\\"></script>\\n</head>"
-       }
-     ]
-   }
-   \`\`\`
-
-5. O JSON deve conter:
-    - path: Caminho absoluto do arquivo (/index.html, /css/style.css, /js/main.js)
-    - explanation: Breve descrição do arquivo/mudança
-    - content: Conteúdo do arquivo (com escapes apropriados)
-
-6. SEMPRE inclua os arquivos base:
-    - index.html
-    - css/style.css (sem / no início)
-    - js/main.js (sem / no início)
-
-7. Ao criar/modificar arquivos:
-    - Use caminhos relativos nos links e src (css/style.css, js/main.js)
-    - Use caminhos absolutos apenas no path do JSON (/index.html)
-    - Forneça uma explicação clara para cada arquivo
-    - Mantenha a estrutura de pastas organizada
-    - Use HTML semântico e boas práticas
-    - Use frameworks via CDN para agilidade
-    - Customize estilos conforme necessário
-    - Use JavaScript moderno (ES6+)
-    - Adicione animações e interatividade
-
-EXEMPLO DE RESPOSTA:
-\`\`\`json
+3. ESTRUTURA DO JSON:
 {
   "files": [
     {
       "path": "/index.html",
-      "explanation": "Página principal do site",
-      "content": "<!DOCTYPE html>\\n<html data-bs-theme=\\"dark\\">\\n<head>\\n  <title>Meu Site</title>\\n  <link href=\\"https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css\\" rel=\\"stylesheet\\">\\n  <link rel=\\"stylesheet\\" href=\\"css/style.css\\">\\n  <script src=\\"js/main.js\\"></script>\\n</head>"
+      "content": "<!doctype html>\\n<html>...</html>",
+      "explanation": "Arquivo HTML principal com todas as CDNs e estrutura"
     },
     {
-      "path": "/css/style.css", 
-      "explanation": "Estilos CSS do site",
-      "content": "body {\\n  margin: 0;\\n  padding: 20px;\\n  font-family: sans-serif;\\n}\\n\\nh1 {\\n  color: #333;\\n}"
+      "path": "/styles.css",
+      "content": "/* Estilos personalizados */",
+      "explanation": "CSS adicional para complementar as bibliotecas"
     },
     {
-      "path": "/js/main.js",
-      "explanation": "JavaScript principal do site",
-      "content": "console.log('Site carregado!');"
+      "path": "/script.js",
+      "content": "// Interatividade e animações",
+      "explanation": "JavaScript para funcionalidades específicas"
     }
   ]
+}`
+
+interface ImageData {
+  mimeType: string;
+  data: string;
 }
-\`\`\` 
-`
 
-export async function chatWithGemini(messages: { role: 'user' | 'assistant', content: string }[]) {
+export const chatWithGemini = async (
+  messages: Array<{ role: string; content: string }>, 
+  image?: ImageData
+) => {
+  const ai = createAI()
+  const lastMessage = messages[messages.length - 1]
+
   try {
-    const model = createAI().getGenerativeModel({ model: 'gemini-2.0-flash-exp' })
-    const chat = model.startChat({
-      history: [
-        { role: 'user', parts: [{ text: systemPrompt }] },
-        { role: 'model', parts: [{ text: 'Entendi. Seguirei todas as regras especificadas.' }] },
-        ...messages.map(msg => ({
-          role: msg.role === 'user' ? 'user' : 'model',
-          parts: [{ text: msg.content }]
-        }))
-      ],
-      generationConfig: {
-        temperature: 0.7,
-        topK: 40,
-        topP: 0.9,
-        maxOutputTokens: 8192,
-      }
-    })
+    const model = ai.getGenerativeModel({ model: 'gemini-2.0-flash-exp' }, { apiVersion: 'v1beta' })
+    let response
 
-    const result = await chat.sendMessage(messages[messages.length - 1].content)
-    const response = await result.response
-    return response.text()
-  } catch (error) {
+    // Preparar o prompt com o systemPrompt
+    const prompt = `${systemPrompt}\n\n${lastMessage.content}`
+
+    // Se tiver imagem, inclui ela no generateContent
+    if (image) {
+      response = await model.generateContent([
+        prompt,
+        {
+          inlineData: {
+            mimeType: image.mimeType,
+            data: image.data
+          }
+        }
+      ])
+    } else {
+      response = await model.generateContent(prompt)
+    }
+
+    if (!response) {
+      throw new Error('Não foi possível gerar uma resposta')
+    }
+
+    const result = await response.response
+    return result.text()
+  } catch (error: any) {
     console.error('Erro ao chamar Gemini:', error)
-    throw new Error('Falha ao processar sua solicitação')
+    throw new Error(error.message || 'Erro ao processar sua solicitação')
   }
 }
