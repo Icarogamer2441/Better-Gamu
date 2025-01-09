@@ -26,7 +26,7 @@ Gamu é um construtor de websites alimentado por IA que permite criar sites inte
 
 ```bash
 git clone https://github.com/Icarogamer2441/Better-Gamu.git
-cd gamu
+cd Better-Gamu
 ```
 
 2. Instale as dependências:
