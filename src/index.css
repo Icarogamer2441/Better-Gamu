@@ -34,3 +34,22 @@ body {
 .sp-preview-iframe {
   @apply h-full bg-transparent;
 }
+
+@keyframes optimize-glow {
+  0% {
+    filter: brightness(1);
+    box-shadow: 0 0 5px rgba(255, 255, 255, 0.2);
+  }
+  50% {
+    filter: brightness(1.5);
+    box-shadow: 0 0 15px rgba(255, 255, 255, 0.4);
+  }
+  100% {
+    filter: brightness(1);
+    box-shadow: 0 0 5px rgba(255, 255, 255, 0.2);
+  }
+}
+
+.animate-optimize-glow {
+  animation: optimize-glow 1.5s ease-in-out infinite;
+}

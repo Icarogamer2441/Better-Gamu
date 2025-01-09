@@ -12,47 +12,65 @@ const createAI = () => {
   return new GoogleGenerativeAI(getApiKey())
 }
 
-const systemPrompt = `Você é uma API que DEVE retornar APENAS um JSON com a estrutura abaixo. IMPORTANTE: Forneça SEMPRE o content e explanation para CADA arquivo.
+const systemPrompt = `Você é um designer e desenvolvedor web especializado em criar sites modernos e únicos. Você DEVE retornar APENAS um JSON com a estrutura abaixo, sem explicações adicionais.
 
-REGRAS OBRIGATÓRIAS:
-1. SEMPRE use CDNs para bibliotecas:
-   - Bootstrap (CSS e JS) ou Tailwind para estilos
-   - FontAwesome ou Material Icons para ícones
-   - Google Fonts para fontes personalizadas
-   - Alpine.js ou jQuery para interatividade leve
-   - AOS (Animate On Scroll) para animações
-   - Swiper para sliders/carrosséis
+REGRAS DE DESIGN:
+1. NUNCA use o mesmo design duas vezes
+2. Crie designs únicos baseados no pedido do usuário
+3. Use elementos visuais modernos e criativos:
+   - Gradientes complexos e únicos
+   - Glassmorphism criativo
+   - Neomorfismo quando apropriado
+   - Animações suaves e elegantes
+   - Micro-interações
+   - Efeitos de parallax
+   - Scrolling suave
+   - Transições entre seções
+   - Efeitos de hover elaborados
+   - Layouts assimétricos
+   - Tipografia expressiva
+   - Formas orgânicas e geométricas
+   - Sombras dinâmicas
+   - Efeitos de profundidade
+   - Cores vibrantes em dark mode
+
+4. SEMPRE use as melhores bibliotecas:
+   - Bootstrap 5 ou Tailwind CSS para estilos base
+   - GSAP para animações complexas
    - Three.js para efeitos 3D
-   - GSAP para animações avançadas
+   - AOS para animações no scroll
+   - Swiper para carrosséis
+   - Locomotive Scroll para smooth scrolling
+   - Splitting.js para animações de texto
+   - Barba.js para transições de página
+   - Tilt.js para efeitos de hover 3D
+   - FontAwesome ou Material Icons
+   - Google Fonts (fontes modernas)
 
-2. SEMPRE use elementos visuais modernos:
-   - Gradientes em backgrounds
-   - Glassmorphism (backdrop-filter: blur)
-   - Temas escuros com cores vibrantes
-   - Sombras suaves
-   - Animações em hover
-   - Bordas arredondadas
-   - Ícones com gradientes
-   - Efeitos de brilho e reflexo
-   - Bordas com gradiente
+5. MANTENHA A CONSISTÊNCIA:
+   - Use o mesmo esquema de cores
+   - Mantenha a identidade visual
+   - Siga as diretrizes de design do usuário
+   - Respeite o tema escuro
+   - Mantenha a harmonia visual
 
-3. ESTRUTURA DO JSON:
+6. ESTRUTURA DO JSON:
 {
   "files": [
     {
       "path": "/index.html",
       "content": "<!doctype html>\\n<html>...</html>",
-      "explanation": "Arquivo HTML principal com todas as CDNs e estrutura"
+      "explanation": "Arquivo HTML principal com estrutura e CDNs"
     },
     {
       "path": "/styles.css",
       "content": "/* Estilos personalizados */",
-      "explanation": "CSS adicional para complementar as bibliotecas"
+      "explanation": "CSS com animações e efeitos visuais"
     },
     {
       "path": "/script.js",
       "content": "// Interatividade e animações",
-      "explanation": "JavaScript para funcionalidades específicas"
+      "explanation": "JavaScript para funcionalidades e efeitos"
     }
   ]
 }`
@@ -67,19 +85,30 @@ export const chatWithGemini = async (
   image?: ImageData
 ) => {
   const ai = createAI()
-  const lastMessage = messages[messages.length - 1]
 
   try {
-    const model = ai.getGenerativeModel({ model: 'gemini-2.0-flash-exp' }, { apiVersion: 'v1beta' })
+    const model = ai.getGenerativeModel({
+      model: 'gemini-2.0-flash-exp',
+      generationConfig: {
+        maxOutputTokens: 8192,
+        temperature: 0.7,
+        topP: 0.8,
+        topK: 40
+      }
+    })
+
+    // Construir o histórico de chat com o systemPrompt apenas na primeira mensagem
+    const chatHistory = messages.map((msg, index) => {
+      if (index === 0) {
+        return `${systemPrompt}\n\n${msg.content}`
+      }
+      return msg.content
+    }).join('\n\nUsuário: ')
+
     let response
-
-    // Preparar o prompt com o systemPrompt
-    const prompt = `${systemPrompt}\n\n${lastMessage.content}`
-
-    // Se tiver imagem, inclui ela no generateContent
     if (image) {
       response = await model.generateContent([
-        prompt,
+        chatHistory,
         {
           inlineData: {
             mimeType: image.mimeType,
@@ -88,7 +117,7 @@ export const chatWithGemini = async (
         }
       ])
     } else {
-      response = await model.generateContent(prompt)
+      response = await model.generateContent(chatHistory)
     }
 
     if (!response) {
@@ -102,3 +131,38 @@ export const chatWithGemini = async (
     throw new Error(error.message || 'Erro ao processar sua solicitação')
   }
 }
+
+const optimizePrompt = async (input: string) => {
+  const ai = createAI()
+  try {
+    const model = ai.getGenerativeModel({
+      model: 'gemini-2.0-flash-exp',
+      generationConfig: {
+        maxOutputTokens: 8192,
+        temperature: 0.7,
+        topP: 0.8,
+        topK: 40
+      }
+    })
+
+    const prompt = `Melhore este prompt para um site, adicionando detalhes essenciais de design e UX que estejam faltando, mantendo a ideia original. Seja detalhado mas mantenha a clareza: "${input}"
+
+REGRAS:
+1. Mantenha o prompt claro e estruturado
+2. Adicione apenas elementos realmente necessários
+3. Não altere a ideia principal
+4. Retorne apenas o prompt melhorado entre aspas, sem explicações
+5. Você pode usar até 8192 tokens na resposta`
+
+    const response = await model.generateContent(prompt)
+    if (!response) throw new Error('Não foi possível gerar uma resposta')
+    
+    const result = await response.response
+    return result.text()
+  } catch (error: any) {
+    console.error('Erro ao otimizar prompt:', error)
+    throw new Error(error.message || 'Erro ao otimizar prompt')
+  }
+}
+
+export { optimizePrompt }

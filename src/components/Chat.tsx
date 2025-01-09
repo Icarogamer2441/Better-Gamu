@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { useChat } from '../hooks/useChat'
 import { Send, Star, Image as ImageIcon } from 'lucide-react'
-import { chatWithGemini } from '../lib/gemini'
+import { chatWithGemini, optimizePrompt } from '../lib/gemini'
 
 interface ChatProps {
   onCodeGenerated: (code: string) => void
@@ -12,6 +12,7 @@ export function Chat({ onCodeGenerated }: ChatProps) {
   const [selectedImage, setSelectedImage] = useState<{ url: string; base64: string } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { messages, sendMessage, isLoading, setMessages } = useChat({ onCodeGenerated })
+  const [isOptimizing, setIsOptimizing] = useState(false)
 
   const convertImageToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -62,24 +63,34 @@ export function Chat({ onCodeGenerated }: ChatProps) {
     setSelectedImage(null)
   }
 
-  const optimizePrompt = async () => {
+  const handleOptimizePrompt = async () => {
     if (!input.trim() || isLoading) return
-
-    const optimizationPrompt = `Melhore brevemente este prompt para um site, adicionando apenas detalhes essenciais de design e UX que estejam faltando, mantendo a ideia original e sendo conciso: "${input}"
-
-REGRAS:
-1. Mantenha o prompt curto e direto
-2. Adicione apenas elementos realmente necessários
-3. Não altere a ideia principal
-4. Retorne apenas o prompt melhorado entre aspas, sem explicações`
+    setIsOptimizing(true)
     
     try {
-      const response = await chatWithGemini([{ role: 'user', content: optimizationPrompt }])
+      const response = await optimizePrompt(input)
       const optimizedPrompt = response.replace(/^.*?["'](.+?)["'].*$/s, '$1')
       setInput(optimizedPrompt)
     } catch (error) {
       console.error('Erro ao otimizar prompt:', error)
+    } finally {
+      setIsOptimizing(false)
     }
+  }
+
+  const getContextIndicator = () => {
+    if (messages.length === 0) return null
+    
+    const lastUserMessage = messages.filter(m => m.role === 'user').pop()
+    if (!lastUserMessage) return null
+
+    return (
+      <div className="px-4 py-2 bg-slate-800/50 border-b border-slate-700/50">
+        <p className="text-xs text-slate-400">
+          Contexto atual: {lastUserMessage.content.slice(0, 100)}...
+        </p>
+      </div>
+    )
   }
 
   return (
@@ -130,55 +141,36 @@ REGRAS:
         </div>
       </div>
 
-      <div className="flex-1 p-4 overflow-auto" style={{ maxHeight: 'calc(100vh - 16rem)' }}>
-        {selectedImage && (
-          <div className="mb-4 relative group">
-            <img 
-              src={selectedImage.url} 
-              alt="Preview" 
-              className="max-w-full h-auto rounded-lg border border-slate-700/50"
-            />
-            <button
-              onClick={() => setSelectedImage(null)}
-              className="absolute top-2 right-2 p-1 bg-red-500/80 hover:bg-red-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-              title="Remover imagem"
-            >
-              <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-        )}
-
-        <div className="space-y-4">
-          {messages.map((message, i) => (
+      {getContextIndicator()}
+      
+      <div className="flex-1 p-4 overflow-auto space-y-4" style={{ maxHeight: 'calc(100vh - 16rem)' }}>
+        {messages.map((message, i) => (
+          <div
+            key={i}
+            className={`flex ${
+              message.role === 'user' ? 'justify-end' : 'justify-start'
+            }`}
+          >
             <div
-              key={i}
-              className={`flex ${
-                message.role === 'user' ? 'justify-end' : 'justify-start'
+              className={`rounded-lg px-4 py-2 max-w-[90%] sm:max-w-[80%] ${
+                message.role === 'user'
+                  ? 'bg-blue-600/20 text-blue-100 hover:bg-blue-600/30 transition-colors'
+                  : 'bg-slate-800/50 text-slate-100 hover:bg-slate-800/70 transition-colors'
               }`}
             >
-              <div
-                className={`rounded-lg px-4 py-2 max-w-[90%] sm:max-w-[80%] ${
-                  message.role === 'user'
-                    ? 'bg-blue-600/20 text-blue-100'
-                    : 'bg-slate-800/50 text-slate-100'
-                }`}
-              >
-                {message.role === 'user' && message.content.includes('base64:') && (
-                  <img 
-                    src={message.content.match(/base64:(.*?)\]/)?.[1]} 
-                    alt="Referência"
-                    className="max-w-full h-auto rounded-lg mb-2"
-                  />
-                )}
-                <p className="whitespace-pre-wrap break-words">
-                  {message.content.replace(/\[Imagem de referência em base64:.*?\]/, '')}
-                </p>
-              </div>
+              {message.role === 'user' && message.content.includes('base64:') && (
+                <img 
+                  src={message.content.match(/base64:(.*?)\]/)?.[1]} 
+                  alt="Referência"
+                  className="max-w-full h-auto rounded-lg mb-2"
+                />
+              )}
+              <p className="whitespace-pre-wrap break-words">
+                {message.content.replace(/\[Imagem de referência em base64:.*?\]/, '')}
+              </p>
             </div>
-          ))}
-        </div>
+          </div>
+        ))}
       </div>
 
       <form onSubmit={handleSubmit} className="p-4 border-t border-slate-700/50">
@@ -197,12 +189,18 @@ REGRAS:
           />
           <button
             type="button"
-            onClick={optimizePrompt}
+            onClick={handleOptimizePrompt}
             disabled={isLoading || !input.trim()}
-            className="px-4 py-2 bg-gradient-to-r from-yellow-600 to-yellow-500 hover:from-yellow-500 hover:to-yellow-400 disabled:opacity-50 rounded-xl transition-all duration-300 shadow-lg shadow-yellow-500/20 hover:shadow-yellow-500/40"
+            className={`
+              px-4 py-2 bg-gradient-to-r from-yellow-600 to-yellow-500 
+              hover:from-yellow-500 hover:to-yellow-400 
+              disabled:opacity-50 rounded-xl transition-all duration-300 
+              shadow-lg shadow-yellow-500/20 hover:shadow-yellow-500/40
+              ${isOptimizing ? 'animate-optimize-glow' : ''}
+            `}
             title="Otimizar prompt"
           >
-            <Star className="h-4 w-4 text-white" />
+            <Star className={`h-4 w-4 text-white ${isOptimizing ? 'animate-pulse' : ''}`} />
           </button>
           <button
             type="submit"
