@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { useChat } from '../hooks/useChat'
 import { Send, Star, Image as ImageIcon } from 'lucide-react'
-import { chatWithGemini, optimizePrompt } from '../lib/gemini'
+import { optimizePrompt } from '../lib/gemini'
 
 interface ChatProps {
   onCodeGenerated: (code: string) => void
